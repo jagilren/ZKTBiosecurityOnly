@@ -46,7 +46,7 @@ class WindowOpenendDoors(Toplevel):
         print(f'Ancho de TopLevel={self.winfo_reqwidth()}, Alto de TopLevel={self.winfo_reqheight()}')
         HayAbiertas= False
         self.OpenDoorsListBox.insert(0,'Las siguientes habitaciones se reportan como abiertas. Revise el sensor para corregir')
-        self.OpenDoorsListBox.itemconfigure(0,{'bg':"khaki3",'fg':"red"})
+        self.OpenDoorsListBox.itemconfigure(0,{'bg':"khaki3",'fg':"white"})
 
         #self.OpenDoorsListBox.itemconfigure(0,background="white", font=underline_font)
         for element in my_dict.keys():
@@ -578,7 +578,7 @@ for element in Dict_Door_ID.keys():
 #Valores finales para la Ventana Principal del mainloop
 
 master.geometry(f'{screen_width+100}x{screen_height}')
-master.title('Apertura Puertas y Garajes Motel Classic')
+master.title('Apertura Puertas y Garajes Motel Only')
 master.config(bg='#68839B')
 p1 = PhotoImage(file='RAM4GB.png')
 p1 = master.iconphoto(True, p1)
