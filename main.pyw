@@ -114,14 +114,15 @@ class NewWindow(Toplevel):
         self.grab_set()
         #self.focus_set()
 
+
         print("Width", windowWidth, "Height", windowHeight)
 
         self.btnAbrir = Button(self, text='Abrir', command=self.AssignProcess)  # height=2, width=3
         self.btnAbrir.grid(row=2, column=0, sticky=NS, pady=20)  # ,
 
-        if DoorType == 'SEDANN':
+        if DoorType == 'SEDAN':
             self.btnCerrar = Button(self, text='Cerrar', command=self.CloseGarageProcess,
-                                    state='ENABLED')  # DISABLED PARA ONLY height=2, width=3
+                                    state='ENABLED')  # height=2, width=3
             self.btnCerrar.grid(row=2, column=1, sticky=NS, pady=20)
 
         self.btnLock = Button(self, text='Bloquear ', command=self.BlockProcess)  # height=2, width=3
@@ -154,11 +155,10 @@ class NewWindow(Toplevel):
     def blinking_ListBoxThread(self):
         self.threadBlinkColorListBox.daemon=True
         self.threadBlinkColorListBox.start()
-    #Proceso de Asignación Cobija Abrir Puerta y Generar Thread para bloqueo de Botón Auxiliar
     def AssignProcess(self):
         self.threadAssign.daemon = True
         self.threadAssign.start()
-        time.sleep(3) # Para asegurarse que la ventana emergente "PACIENCIA" si se active
+        time.sleep(3) # Para asegurarse que la ventana emergente PACIENCIA si se active
         self.destroy()
         time.sleep(2) #Para que no se den Click super rápido en otro botón
 
@@ -227,8 +227,8 @@ class NewWindow(Toplevel):
         self.destroy()
 
     def GarageStatus_GarageClose(self):
-        if API_Door_Status(self.IDDoor) == '2': #Si garaje esta abierto
-            print(f'Garaje en recorrido de Cierre')
+        if API_Door_Status(self.IDDoor) == '2':
+            print(f'Garaje Abierto....Cerrando Garaje')
             self.threadDelayRouteOpen.daemon = True
             self.threadDelayRouteOpen.start()
 
@@ -239,46 +239,35 @@ class NewWindow(Toplevel):
             except:
                 print('Error en API de Cerrado de Garaje')
         else:
-            print("GARAJE Ya está Cerrado.  No se ejecuta la acción")
+            print("GARAJE Ya está Cerrada.  No se ejecuta la acción")
             self.Write_logListBox('--- GARAJE YA ESTÁ CERRADO ---')
             self.foreground_logListBox("orchid1")
-    #Inicia Procesos de Apertura de Puerta, Desbloqueo de Botón y Thread para Bloqueo de Botón
+
     def DoorOpen_ButtonOpen_ButtonClose(self):
         # Vamos a Revisar si el garaje está Abierto
         if Dict_Door_Type[self.boton.cget('text')] == 'SEDAN':
             if API_Door_Status(self.IDDoor) == '1':  #1 SIGNIGFICA CERRADA
                 print(f'GARAJE en recorrido de Apertura')
                 try:
-                    self.threadDelayRouteOpen.daemon = True #Evita que se ejecute varias veces la orden de abrir
+                    self.threadDelayRouteOpen.daemon = True
                     self.threadDelayRouteOpen.start()
                     self.API_door()  # Abre si está cerrada para SEDAN
                 except:
                     print('Error en API_Door, Revise API desde la Plataforma ZKT')
 
             else:
-                print("GARAJE YA ESTA ABIERTO.  No se ejecuta la acción")
+                print("GARAJE Ya está Abierta.  No se ejecuta la acción")
                 self.RedundantOperation = True
                 self.Write_logListBox('--- GARAJE YA ESTÁ ABIERTO --- MIRE LAS CÁMARAS O USE EL BOTON "CERRAR"---')
                 self.foreground_logListBox("orchid1")
                 self.blinking_ListBoxThread()
-        else:  # Si es Moto o Peaton cuando es cantonera es totalmente diferenca a cerradura magnética
-            '''Abre  moto o peaton sin importar estado de la puerta
-                Con cerradura magnética debemos determinar cuanto tiempo se debe quedar abierto el contacto de la interfaz "LOCK" 
-                a traves del "Interval parameter" de la API /door/remoteOpen 
-            '''
-            self.API_door()
+        else:  # Si es Moto o Peaton
+            self.API_door()  # Abre de una si es moto o peaton sin importar estado de la puerta
             print(f'Wait...02 seconds for AuxNormalOpen Execution')
             time.sleep(2)
             # self.API_door()  # Repite pulso apertura  para Cantoneras desobedientes
-            ''' Para Only Motos, Debemos aplicar EndPoint para Door que Abra el Circuito (Por 5 minutos o más) y que sólo quede cerrado el AuxOut 
-                de tal manera que cuando el cliente oprima el Interruptor de la habitación, se abra el circuito totalmente
-                y se desmagnetize el imán para que se abra la puerta 
-            '''
-        time.sleep(15) if Dict_Door_Type[self.boton.cget('text')] == 'SEDAN' else time.sleep(2)  #Para sensor que activa finalizando recorrido de apertura usar 15 segundos
-                                                                                               #Para sensor que activa iniciando recorrido de apertura usar 02 segundos
-        lap = 15 if Dict_Door_Type[self.boton.cget('text')] == 'SEDAN' else 2
-        print(f'Wait...{lap} seconds for AuxNormalOpen Execution')
-        # Activa el Botón de apertura del lado del cliente
+        time.sleep(2)
+        print(f'Wait...02 seconds for AuxNormalOpen Execution')
         self.API_AuxButtonNormalOpen()
         if not(self.RedundantOperation):
             self.Write_logListBox(f'--- {self.boton.cget("text")} DESBLOQUEADA ---')
@@ -290,22 +279,21 @@ class NewWindow(Toplevel):
                     self.Write_logListBox(f'--- GARAJE {self.boton.cget("text")}  ESTÁ ABIERTO  ---')
                     self.foreground_logListBox("goldenrod1")
             else:  # Si no cambió el estado del Sensor
-                self.Write_logListBox('--- GARAJE PERMANECIO CERRADO ---')
+                self.Write_logListBox('--- GARAJE PERMANECIO CERRADA ---')
                 self.foreground_logListBox("pink")
         else:  # Si es Moto o Peaton
             self.Write_logListBox('--- ABRIÓ GARAJE ---')
             self.foreground_logListBox("goldenrod1")
 
         labelQueryResult.config(text="Esperando...", background='black')
-        #Ciclo For para demorar el tiempo de Desactivación o aislamiento del Botón de Bloqueo
-        for element in range(int(Dict_Ini_Params['TimeOutButtonNormalOpen'])): #Lo normal son 300 segundos
+        #Ciclo For para demorar el tiempo de Desactivación del Botón de Bloqueo
+        for element in range(int(Dict_Ini_Params['TimeOutButtonNormalOpen'])):
             time.sleep(1)
             print(f'Resting Time for  Threading AuxButtoonClose  = {int(Dict_Ini_Params["TimeOutButtonNormalOpen"])-element}  "AuxButtonClose Next to Execute threadAssignProcess" \n')
         self.API_AuxButtonClose()
         self.Write_logListBox('--- BLOQUEADA ---')
         self.foreground_logListBox("SeaGreen1")
 
-    # ENDPOINT Con uso por definir
     def ButtonClose(self):
         ResponseButtonClose = self.API_AuxButtonClose()
         if ResponseButtonClose == 'success':
@@ -313,7 +301,7 @@ class NewWindow(Toplevel):
         threadLabelWaiting = MTThread(name='Labeling', target=LabelWaiting)
         threadLabelWaiting.start()
         self.destroy()
-    # ENDPOINT para Des-Bloquear remoteNormalOpenByAuxOutById, es decir Activar el Botón de apertura
+
     def API_AuxButtonNormalOpen(self):
         endpoint_Aux = 'http://' + Dict_Ini_Params[
             'IPV4AddressServer'] + '/api/auxOut/remoteNormalOpenByAuxOutById?id=' + self.IDAuxOut + \
@@ -323,7 +311,6 @@ class NewWindow(Toplevel):
         return response.json()['message']
         time.sleep(5)
 
-    # ENDPOINT para Bloquear remoteCloseByAuxOutById, es decir aislar o desactivar el Botón de apertura del lado del cliente
     def API_AuxButtonClose(self):
         endpoint_Aux = 'http://' + Dict_Ini_Params[
             'IPV4AddressServer'] + '/api/auxOut/remoteCloseByAuxOutById?id=' + self.IDAuxOut + \
@@ -351,15 +338,13 @@ class NewWindow(Toplevel):
 
 def DelayRouteOpenOrClose(btn):
     boolGarageInRouteOpen = True
-
-    btn.bind("<Button-1>",
+    btn.bind("<Button>",
              lambda e: messagebox.showinfo("Paciencia","Garaje en recorrido 'PACIENCIA'"))
     print (f'Cambió Bind para <Button> {btn.cget("text")}')
     print (f'Thead Delay Route Open Garage Iniciado durante {int(Dict_Ini_Params["DelayRouteOpenGaraje_Secs"])}')
     time.sleep(int(Dict_Ini_Params["DelayRouteOpenGaraje_Secs"])) # Demora de la Apertura Total del Garage
     boolGarageInRouteOpen = False
-
-    btn.bind("<Button-1>",
+    btn.bind("<Button>",
              lambda e, boton=btn, IDDoor=Dict_Door_ID[btn.cget('text')], IDAuxOut=Dict_AuxOut_ID[btn.cget('text')],
                     DoorType=Dict_Door_Type[btn.cget('text')]: NewWindow(master, boton, hab_ENTRY, IDDoor, IDAuxOut, DoorType,
                                                                          my_headers))
@@ -380,7 +365,7 @@ def validate_entry(text, new_text):
         print(f'Entraste al finally')
 
 def LabelWaiting():
-    for tiempo in range(10):
+    for tiempo in range(5):
         time.sleep(1)
         print("Waiting for Change Text Label")
     labelQueryResult.config(text="Esperando...", background='black')
@@ -402,13 +387,13 @@ class MTThread(Thread):
 
 
 threadLabelWaiting = MTThread(name='Labeling', target=LabelWaiting)
-def submitQuery(labelQueryResult, BioSecurityStatus, HabitacionLabel= None):
-    if not (HabitacionLabel):
+def submitQuery(labelQueryResult, BioSecurityStatus):
+    if not (hab_var.get()):
         return
     if BioSecurityStatus == False:
         infoconexion = messagebox.showinfo("Error de Conexión", "Servidor de Puertas Desconectado \n Verifique RED")
         return
-    prefixHab = 'HAB0' + HabitacionLabel if len(HabitacionLabel) == 1 else 'HAB' + HabitacionLabel
+    prefixHab = 'HAB0' + hab_var.get() if len(hab_var.get()) == 1 else 'HAB' + hab_var.get()
     IDAuxOut = Dict_AuxOut_ID[prefixHab]
     IDDoor = Dict_Door_ID[prefixHab]
     typeDoor = Dict_Door_Type[prefixHab]
@@ -461,10 +446,6 @@ def leer_csv(filename):
             # door_ids=row.split(",")
             rows[row[0]] = row[1]
     return rows
-
-def on_double_click(e, boton):
-    hab_ENTRY.config(text=boton)
-    print(f"Escribiendo en el textbox {boton}")
 
 boolGarageInRouteOpen = False
 intCountWarningConnectivy=0
@@ -534,9 +515,9 @@ hab_ENTRY.grid(row=0, column=0, sticky=W) #
 btnQuery = Button(f_query, text="CONSULTAR", padding=1, command=NONE, width=15)
 btnQuery.grid(row=1, column=0, pady=2, sticky=W) #
 btnQuery.bind("<Button>",
-              lambda e, HabitacionLabel=hab_var.get(), IDAuxOut=hab_var.get(): submitQuery(labelQueryResult, BioSecurityStatus, HabitacionLabel))
+              lambda e, IDDoor=hab_var.get(), IDAuxOut=hab_var.get(): submitQuery(labelQueryResult, BioSecurityStatus))
 btnQuery.bind('<Return>',
-              lambda e, HabitacionLabel=hab_var.get(), IDAuxOut=hab_var.get(): submitQuery(labelQueryResult, BioSecurityStatus,HabitacionLabel))
+              lambda e, IDDoor=hab_var.get(), IDAuxOut=hab_var.get(): submitQuery(labelQueryResult, BioSecurityStatus))
 btnQOpenedDoors =Button(f_openedDoors, text="PUERTAS ABIERTAS", padding=1, command=NONE, width=18,style="small.TButton")
 btnQOpenedDoors.grid(row=2, column=6, pady=2)
 my_dict={'a': 'A', 'b': 'B'}
@@ -574,14 +555,11 @@ for element in Dict_Door_ID.keys():
         elif (Dict_Door_Type[element]=='MOTO' or Dict_Door_Type[element]=='HIBRIDO'):
             btn_dict[element] = Button(frame_buttons, text=element, padding=10, state=state, style="moto.TButton")
 
-        btn_dict[element].bind("<Button-1>",
-                      lambda e, boton=btn_dict[element], IDDoor=Dict_Door_ID[btn_dict[element].cget('text')],
-                             IDAuxOut=Dict_AuxOut_ID[btn_dict[element].cget('text')],
+        btn_dict[element].bind("<Button>",
+                      lambda e, boton=btn_dict[element], IDDoor=Dict_Door_ID[btn_dict[element].cget('text')], IDAuxOut=Dict_AuxOut_ID[btn_dict[element].cget('text')],
                              DoorType=Dict_Door_Type[btn_dict[element].cget('text')]: NewWindow(master, boton, hab_ENTRY, IDDoor, IDAuxOut,
                                                                                        DoorType,
                                                                                        my_headers))
-        #btn_dict[element].bind("<Button-3>", lambda e,boton=btn_dict[element].cget('text')[3:5]: on_double_click(e, boton))
-        btn_dict[element].bind("<Button-3>",lambda e, HabitacionLabel=btn_dict[element].cget('text')[3:5]: submitQuery(labelQueryResult, BioSecurityStatus, HabitacionLabel))
     else:
         btn_dict[element] = Button(frame_buttons, text='...', padding=10, state=state)
 
