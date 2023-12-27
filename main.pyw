@@ -87,7 +87,8 @@ class NewWindow(Toplevel):
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=1)
         self.DoorStatus = '1'
-        self.threadAssign = Thread(target=self.DoorOpen_ButtonOpen_ButtonClose, name='threadAssign')
+        self.thread_AssignMagneticas = Thread(target=self.DoorOpen_ButtonOpen_ButtonClose_Electricas, name='threadAssignElectricas')
+        self.thread_AssignElectricas = Thread(target=self.DoorOpen_ButtonOpen_ButtonClose_Electricas, name='threadAssignElectricas')
         self.threadCloseGarage = Thread(target=self.GarageStatus_GarageClose, name='threadCloseGarage')
         self.threadUnBlock = Thread(target=self.ButtonOpen_ButtonClose, name='threadUnBlock')
         self.threadBlock = Thread(target=self.ButtonClose, name='threadBlock')
@@ -117,7 +118,7 @@ class NewWindow(Toplevel):
 
         print("Width", windowWidth, "Height", windowHeight)
 
-        self.btnAbrir = Button(self, text='Abrir', command=self.AssignProcess)  # height=2, width=3
+        self.btnAbrir = Button(self, text='Abrir', command=self.AssignProcessElectricas)  # height=2, width=3
         self.btnAbrir.grid(row=2, column=0, sticky=NS, pady=20)  # ,
 
         if DoorType == 'SEDAN':
@@ -155,9 +156,9 @@ class NewWindow(Toplevel):
     def blinking_ListBoxThread(self):
         self.threadBlinkColorListBox.daemon=True
         self.threadBlinkColorListBox.start()
-    def AssignProcess(self):
-        self.threadAssign.daemon = True
-        self.threadAssign.start()
+    def AssignProcessElectricas(self):
+        self.thread_AssignElectricas.daemon = True
+        self.thread_AssignElectricas.start()
         time.sleep(3) # Para asegurarse que la ventana emergente PACIENCIA si se active
         self.destroy()
         time.sleep(2) #Para que no se den Click super rápido en otro botón
@@ -190,10 +191,10 @@ class NewWindow(Toplevel):
         threadLabelWaiting.start()
         self.destroy()
 
-    def API_door(self):
-        endpoint_Door = 'http://' + Dict_Ini_Params[
+    def API_door(self, Intervalosecs):
+        endpoint_Door = f'http://' + Dict_Ini_Params[
             'IPV4AddressServer'] + '/api/door/remoteOpenById?' + 'doorId=' + self.IDDoor + \
-                        '&interval=1' + APIToken
+                        f'&interval={Intervalosecs}' + APIToken
         # print(frame_buttons'url_abrir_cerrar_puerta {endpoint_Door}')
         response = requests.post(endpoint_Door, headers=self.my_headers)
         print(f'Respuesta JSON API_DoorOpen: {response.json()}')
@@ -214,7 +215,7 @@ class NewWindow(Toplevel):
             print("Garaje Ya Esta Cerrada.  No se Ejecuta la acción")
 
     def ButtonOpen_ButtonClose(self):
-        ResponseButtonOpen = self.API_AuxButtonNormalOpen()
+        ResponseButtonOpen = self.API_AuxOutButtonRemoteNormalOpen()
         if ResponseButtonOpen == 'success':
             labelQueryResult.config(text=self.boton.cget('text') + " Desbloqueda", background='red')
 
@@ -233,7 +234,7 @@ class NewWindow(Toplevel):
             self.threadDelayRouteOpen.start()
 
             try:
-                self.API_door()  # Cierra la puerta  para SEDAN si está abierta. Con comando de Abrir por caprichos de ZKT
+                self.API_door(Intervalosecs=1)  # Cierra la puerta  para SEDAN si está abierta. Con comando de Abrir por caprichos de ZKT
                 self.Write_logListBox('--- CERRANDO GARAJE ---')
                 self.foreground_logListBox("SeaGreen1")
             except:
@@ -243,7 +244,40 @@ class NewWindow(Toplevel):
             self.Write_logListBox('--- GARAJE YA ESTÁ CERRADO ---')
             self.foreground_logListBox("orchid1")
 
-    def DoorOpen_ButtonOpen_ButtonClose(self):
+    def DoorOpen_ButtonOpen_ButtonClose_Magneticas(self): #Para Cerraduras Magneticas del Motel Only
+        # Vamos a Revisar si el garaje está Abierto
+
+        #self.API_AuxOutButtonRemoteNormalOpen() #Pendiente de implementación
+        self.API_door(Intervalosecs=10)  # Pasa de NC a NO, para desenergizar una de las derivaciones de Voltaje que va al Magneto, Intervalo >1 por Revisar
+        print(f'Wait...02 seconds for AuxNormalOpen Execution')
+        time.sleep(2)
+        # self.API_door()  # Repite pulso apertura  para Cantoneras desobedientes
+        print(f'Wait...02 seconds for AuxNormalOpen Execution')
+        if not(self.RedundantOperation):
+            self.Write_logListBox(f'--- {self.boton.cget("text")} DESBLOQUEADA ---')
+            self.foreground_logListBox("goldenrod1")
+        time.sleep(2)
+        if Dict_Door_Type[self.boton.cget('text')] == 'SEDAN':
+            if API_Door_Status(self.IDDoor) == '2': #2 Siginifica Garaje o Puerta Abierta
+                if not(self.RedundantOperation):
+                    self.Write_logListBox(f'--- GARAJE {self.boton.cget("text")}  ESTÁ ABIERTO  ---')
+                    self.foreground_logListBox("goldenrod1")
+            else:  # Si no cambió el estado del Sensor
+                self.Write_logListBox('--- GARAJE PERMANECIO CERRADA ---')
+                self.foreground_logListBox("pink")
+        else:  # Si es Moto o Peaton
+            self.Write_logListBox('--- ABRIÓ GARAJE ---')
+            self.foreground_logListBox("goldenrod1")
+
+        labelQueryResult.config(text="Esperando...", background='black')
+        #Ciclo For para demorar el tiempo de Desactivación del Botón de Bloqueo
+        for element in range(int(Dict_Ini_Params['TimeOutButtonNormalOpen'])):
+            time.sleep(1)
+            print(f'Resting Time for  Threading AuxButtoonClose  = {int(Dict_Ini_Params["TimeOutButtonNormalOpen"])-element}  "AuxButtonClose Next to Execute threadAssignProcess" \n')
+        self.API_AuxButtonClose()
+        self.Write_logListBox('--- BLOQUEADA ---')
+        self.foreground_logListBox("SeaGreen1")
+    def DoorOpen_ButtonOpen_ButtonClose_Electricas(self):
         # Vamos a Revisar si el garaje está Abierto
         if Dict_Door_Type[self.boton.cget('text')] == 'SEDAN':
             if API_Door_Status(self.IDDoor) == '1':  #1 SIGNIGFICA CERRADA
@@ -251,7 +285,7 @@ class NewWindow(Toplevel):
                 try:
                     self.threadDelayRouteOpen.daemon = True
                     self.threadDelayRouteOpen.start()
-                    self.API_door()  # Abre si está cerrada para SEDAN
+                    self.API_door(Intervalosecs=1)  # Abre si está cerrada para SEDAN
                 except:
                     print('Error en API_Door, Revise API desde la Plataforma ZKT')
 
@@ -262,13 +296,15 @@ class NewWindow(Toplevel):
                 self.foreground_logListBox("orchid1")
                 self.blinking_ListBoxThread()
         else:  # Si es Moto o Peaton
-            self.API_door()  # Abre de una si es moto o peaton sin importar estado de la puerta
+            self.API_door(Intervalosecs=10)  # Abre de una si es moto o peaton sin importar estado de la puerta.
+            '''# Este bloque de código nunca lo ejecutará Motel Only
+                 Porque para la apertura de puerta de Motos no se ejecuta esta funcion'''
             print(f'Wait...02 seconds for AuxNormalOpen Execution')
             time.sleep(2)
             # self.API_door()  # Repite pulso apertura  para Cantoneras desobedientes
         time.sleep(2)
         print(f'Wait...02 seconds for AuxNormalOpen Execution')
-        self.API_AuxButtonNormalOpen()
+        self.API_AuxOutButtonRemoteNormalOpen()
         if not(self.RedundantOperation):
             self.Write_logListBox(f'--- {self.boton.cget("text")} DESBLOQUEADA ---')
             self.foreground_logListBox("goldenrod1")
@@ -302,7 +338,7 @@ class NewWindow(Toplevel):
         threadLabelWaiting.start()
         self.destroy()
 
-    def API_AuxButtonNormalOpen(self):
+    def API_AuxOutButtonRemoteNormalOpen(self):
         endpoint_Aux = 'http://' + Dict_Ini_Params[
             'IPV4AddressServer'] + '/api/auxOut/remoteNormalOpenByAuxOutById?id=' + self.IDAuxOut + \
                        APIToken
